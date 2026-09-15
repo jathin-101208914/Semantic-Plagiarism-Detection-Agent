@@ -1,0 +1,7 @@
+Solar energy adoption has increased rapidly over the last decade due to falling photovoltaic panel production costs and favorable government subsidies.
+
+Wind turbine technology continues to improve efficiency, enabling offshore wind farms to generate reliable electricity for coastal cities.
+
+Battery energy storage systems are essential for managing intermittent power generation from solar and wind farms, ensuring grid stability.
+
+Modern smart grids leverage advanced sensor networks and real-time data analytics to balance supply and demand efficiently across distribution networks.
