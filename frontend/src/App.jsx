@@ -7,7 +7,8 @@ import SimilarityChart from './components/SimilarityChart';
 import MatchingSectionCard from './components/MatchingSectionCard';
 import FilterBar from './components/FilterBar';
 import ThresholdConfigModal from './components/ThresholdConfigModal';
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Circle } from 'lucide-react';
+import ReportModal from './components/ReportModal';
+import { FileText, RefreshCw, AlertCircle, CheckCircle2, Circle, PlusCircle } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -41,6 +42,7 @@ export default function App() {
     paraphrase: 0.70
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   // Filtering State
   const [activeFilter, setActiveFilter] = useState('ALL');
@@ -243,10 +245,10 @@ export default function App() {
 
         {/* Results Analysis Dashboard */}
         {analysisResult && (
-          <div className="mt-12 space-y-8 animate-fadeIn">
-            
+          <div className="mt-12 space-y-8">
+
             {/* Section Divider */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
               <div>
                 <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
                   <span>Semantic Plagiarism Report</span>
@@ -255,31 +257,31 @@ export default function App() {
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  Evaluated using <code className="text-indigo-300">all-MiniLM-L6-v2</code> embedding vectors & cosine similarity
+                  Evaluated using <code className="text-indigo-300">all-MiniLM-L6-v2</code> sentence embeddings &amp; cosine similarity
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={startNewAnalysis}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
                 >
-                  New analysis
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>New Analysis</span>
                 </button>
                 <button
                   onClick={() => triggerAnalysis()}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Re-evaluate</span>
                 </button>
-
                 <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 rounded-xl gradient-bg hover:opacity-95 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                  onClick={() => setIsReportOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl gradient-bg hover:opacity-95 text-white text-xs font-bold shadow"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Print Report</span>
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>View / Download Report</span>
                 </button>
               </div>
             </div>
@@ -305,13 +307,24 @@ export default function App() {
 
             {/* Section Matching Comparison Cards */}
             <div className="space-y-4">
-              {filteredSections.length > 0 ? (
+              {analysisResult.sections.length === 0 ? (
+                <div className="glass-panel rounded-2xl p-12 text-center space-y-2">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+                  <p className="text-base font-bold text-white">No sections returned</p>
+                  <p className="text-sm text-slate-400">The backend returned no section matches. Ensure both documents contain readable text.</p>
+                </div>
+              ) : filteredSections.length > 0 ? (
                 filteredSections.map((sec) => (
                   <MatchingSectionCard key={sec.student_index} section={sec} />
                 ))
               ) : (
-                <div className="glass-panel rounded-2xl p-12 text-center text-slate-400">
-                  <p className="text-sm font-semibold">No matching sections found for the selected filter or search term.</p>
+                <div className="glass-panel rounded-2xl p-10 text-center space-y-2">
+                  <p className="text-sm font-bold text-slate-300">No sections match this filter.</p>
+                  <p className="text-xs text-slate-500">
+                    {activeFilter !== 'ALL'
+                      ? `There are no "${activeFilter}" sections${searchQuery ? ' matching your search' : ''}.`
+                      : 'Try clearing your search term.'}
+                  </p>
                 </div>
               )}
             </div>
@@ -327,6 +340,14 @@ export default function App() {
         onClose={() => setIsModalOpen(false)}
         currentThresholds={thresholds}
         onSaveThresholds={handleSaveThresholds}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        analysisResult={analysisResult}
+        thresholds={thresholds}
       />
 
     </div>
