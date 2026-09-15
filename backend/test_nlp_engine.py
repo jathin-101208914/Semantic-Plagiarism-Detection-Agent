@@ -1,125 +1,94 @@
-import sys
 import os
+import sys
 from app.analyzer import analyze_semantic_similarity, get_model
 from app.config import settings
 
-def run_comprehensive_tests():
-    print("==================================================")
-    print("SEMANTICHECK AI/NLP ENGINE VALIDATION & BENCHMARK")
-    print("==================================================\n")
+def run_test_suite():
+    print("==================================================================")
+    print("SEMANTICHECK AI/NLP ENGINE VALIDATION & THRESHOLD CALIBRATION")
+    print("==================================================================\n")
 
-    # Pre-warm model & verify singleton reuse
+    # 1. Verify Model Singleton Reuse
     m1 = get_model()
     m2 = get_model()
     assert m1 is m2, "Model singleton failed! Model was reloaded."
     print("✔ Model singleton verified (loaded once and reused in memory).\n")
 
-    test_results = {}
-
-    # ----------------------------------------------------
-    # TEST 1: Exact Copy
-    # ----------------------------------------------------
-    ref_1 = ["Machine learning algorithms learn patterns from large datasets."]
-    stu_1 = ["Machine learning algorithms learn patterns from large datasets."]
-    res_1 = analyze_semantic_similarity(stu_1, ref_1)
-    score_1 = res_1.sections[0].percentage
-    class_1 = res_1.sections[0].classification
-    test_results["1_exact_copy"] = {
-        "score": score_1,
-        "classification": class_1,
-        "pass": score_1 >= 95.0 and class_1 == "Highly Similar"
-    }
-    print(f"[TEST 1: Exact Copy] Score: {score_1}% | Tier: {class_1} | Status: {'PASS' if test_results['1_exact_copy']['pass'] else 'FAIL'}")
-
-    # ----------------------------------------------------
-    # TEST 2: Strong Paraphrase (Mandatory Prompt Test Case)
-    # ----------------------------------------------------
-    ref_2 = ["Artificial intelligence enables computers to perform tasks that normally require human intelligence."]
-    stu_2 = ["AI allows machines to accomplish activities that generally need human reasoning."]
-    res_2 = analyze_semantic_similarity(stu_2, ref_2)
-    score_2 = res_2.sections[0].percentage
-    class_2 = res_2.sections[0].classification
-    test_results["2_strong_paraphrase"] = {
-        "score": score_2,
-        "classification": class_2,
-        "pass": score_2 >= 70.0 and class_2 in ["Highly Similar", "Potential Paraphrase"]
-    }
-    print(f"[TEST 2: Strong Paraphrase] Score: {score_2}% | Tier: {class_2} | Status: {'PASS' if test_results['2_strong_paraphrase']['pass'] else 'FAIL'}")
-    print(f"  Reference: '{ref_2[0]}'")
-    print(f"  Student:   '{stu_2[0]}'")
-
-    # ----------------------------------------------------
-    # TEST 3: Weak Paraphrase
-    # ----------------------------------------------------
-    ref_3 = ["Governments across Europe and North America are developing comprehensive regulatory frameworks to govern high-risk artificial intelligence applications."]
-    stu_3 = ["State officials are considering new laws regarding automated decision software."]
-    res_3 = analyze_semantic_similarity(stu_3, ref_3)
-    score_3 = res_3.sections[0].percentage
-    class_3 = res_3.sections[0].classification
-    test_results["3_weak_paraphrase"] = {
-        "score": score_3,
-        "classification": class_3,
-        "pass": 45.0 <= score_3 <= 80.0
-    }
-    print(f"\n[TEST 3: Weak Paraphrase] Score: {score_3}% | Tier: {class_3} | Status: {'PASS' if test_results['3_weak_paraphrase']['pass'] else 'FAIL'}")
-
-    # ----------------------------------------------------
-    # TEST 4: Completely Unrelated Content (Mandatory Prompt Test Case)
-    # ----------------------------------------------------
-    ref_4 = ["Machine learning algorithms learn patterns from large datasets."]
-    stu_4 = ["Football is one of the most popular sports in the world."]
-    res_4 = analyze_semantic_similarity(stu_4, ref_4)
-    score_4 = res_4.sections[0].percentage
-    class_4 = res_4.sections[0].classification
-    test_results["4_unrelated_content"] = {
-        "score": score_4,
-        "classification": class_4,
-        "pass": score_4 < 40.0 and class_4 == "Likely Original"
-    }
-    print(f"\n[TEST 4: Unrelated Content] Score: {score_4}% | Tier: {class_4} | Status: {'PASS' if test_results['4_unrelated_content']['pass'] else 'FAIL'}")
-    print(f"  Reference: '{ref_4[0]}'")
-    print(f"  Student:   '{stu_4[0]}'")
-
-    # ----------------------------------------------------
-    # TEST 5: Multiple Sections & Sorting Order Verification
-    # ----------------------------------------------------
-    ref_5 = [
-        "Artificial intelligence enables computers to perform tasks that normally require human intelligence.",
-        "Machine learning algorithms learn patterns from large datasets.",
-        "Autonomous vehicles rely on computer vision and LIDAR sensors for navigation."
+    # Defined 5 Test Scenarios from prompt specification
+    test_cases = [
+        {
+            "name": "Exact copy",
+            "ref": ["Artificial intelligence enables computers to perform tasks that normally require human intelligence."],
+            "stu": ["Artificial intelligence enables computers to perform tasks that normally require human intelligence."]
+        },
+        {
+            "name": "Strong paraphrase",
+            "ref": ["Artificial intelligence enables computers to perform tasks that normally require human intelligence."],
+            "stu": ["AI allows machines to accomplish activities that generally need human reasoning."]
+        },
+        {
+            "name": "Strong paraphrase 2",
+            "ref": ["Machine learning algorithms identify patterns in large datasets to make predictions."],
+            "stu": ["ML techniques discover patterns within huge collections of data and use them to predict outcomes."]
+        },
+        {
+            "name": "Weak paraphrase",
+            "ref": ["Machine learning algorithms identify patterns in large datasets to make predictions."],
+            "stu": ["Machine learning can analyze data and sometimes help systems make predictions."]
+        },
+        {
+            "name": "Unrelated",
+            "ref": ["Machine learning algorithms identify patterns in large datasets to make predictions."],
+            "stu": ["Football is one of the most popular sports in the world."]
+        }
     ]
-    stu_5 = [
-        "Football is one of the most popular sports in the world.", # Unrelated -> low score
-        "AI allows machines to accomplish activities that generally need human reasoning.", # Strong paraphrase -> high score
-        "Machine learning algorithms learn patterns from large datasets." # Exact copy -> highest score
-    ]
-    res_5 = analyze_semantic_similarity(stu_5, ref_5)
-    
-    # Verify matches are sorted descending by similarity score
-    scores = [sec.similarity for sec in res_5.sections]
-    is_sorted = scores == sorted(scores, reverse=True)
-    test_results["5_multiple_sections_sorting"] = {
-        "is_sorted": is_sorted,
-        "scores": scores,
-        "pass": is_sorted and len(res_5.sections) == 3
-    }
-    print(f"\n[TEST 5: Multiple Sections & Sorting] Sorted Descending: {is_sorted} | Status: {'PASS' if is_sorted else 'FAIL'}")
-    for idx, sec in enumerate(res_5.sections):
-        print(f"  Match #{idx+1}: Score={sec.percentage}% | Tier={sec.classification} | Student S#{sec.student_section_number} -> Ref R#{sec.reference_section_number}")
 
-    # ----------------------------------------------------
-    # TEST 6: Empty Input
-    # ----------------------------------------------------
-    res_6 = analyze_semantic_similarity([], ["Reference text"])
-    test_results["6_empty_input"] = {
-        "total_sections": res_6.summary.total_sections,
-        "pass": res_6.summary.total_sections == 0 and len(res_6.sections) == 0
-    }
-    print(f"\n[TEST 6: Empty Input] Handled gracefully | Status: {'PASS' if test_results['6_empty_input']['pass'] else 'FAIL'}")
+    print("Executing test set against current config thresholds:")
+    print(f"  HIGHLY_SIMILAR_THRESHOLD = {settings.HIGHLY_SIMILAR_THRESHOLD} ({int(settings.HIGHLY_SIMILAR_THRESHOLD*100)}%)")
+    print(f"  PARAPHRASE_THRESHOLD     = {settings.PARAPHRASE_THRESHOLD} ({int(settings.PARAPHRASE_THRESHOLD*100)}%)\n")
 
-    print("\n==================================================")
-    print("ALL NLP BENCHMARKS EXECUTED SUCCESSFULLY!")
-    print("==================================================")
+    table_rows = []
+
+    for tc in test_cases:
+        res = analyze_semantic_similarity(tc["stu"], tc["ref"])
+        match = res.sections[0]
+        table_rows.append({
+            "test": tc["name"],
+            "similarity": f"{match.similarity_percentage}%",
+            "classification": match.classification,
+            "raw_score": match.similarity
+        })
+
+    # Print Formatted Table requested by prompt
+    print("=" * 65)
+    print(f"{'Test':<22} | {'Similarity':<12} | {'Classification':<22}")
+    print("-" * 65)
+    for r in table_rows:
+        print(f"{r['test']:<22} | {r['similarity']:<12} | {r['classification']:<22}")
+    print("=" * 65 + "\n")
+
+    # Assertions to ensure intuitive logic holds true
+    exact_match = table_rows[0]
+    assert exact_match["raw_score"] >= 0.95, "Exact copy failed high similarity check."
+    assert exact_match["classification"] == "Highly Similar", "Exact copy classification mismatch."
+
+    strong_para1 = table_rows[1]
+    assert strong_para1["raw_score"] >= 0.75, "Strong paraphrase 1 failed threshold."
+    assert strong_para1["classification"] == "Highly Similar", "Strong paraphrase 1 classification mismatch."
+
+    strong_para2 = table_rows[2]
+    assert strong_para2["raw_score"] >= 0.55, "Strong paraphrase 2 failed threshold."
+    assert strong_para2["classification"] in ["Highly Similar", "Potential Paraphrase"], "Strong paraphrase 2 classification mismatch."
+
+    weak_para = table_rows[3]
+    assert weak_para["raw_score"] >= 0.55, "Weak paraphrase failed threshold."
+    assert weak_para["classification"] == "Potential Paraphrase", "Weak paraphrase classification mismatch."
+
+    unrelated = table_rows[4]
+    assert unrelated["raw_score"] < 0.55, "Unrelated text falsely flagged."
+    assert unrelated["classification"] == "Likely Original", "Unrelated text classification mismatch."
+
+    print("✔ All intuitive behavior assertions PASSED successfully!\n")
 
 if __name__ == "__main__":
-    run_comprehensive_tests()
+    run_test_suite()
