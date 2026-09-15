@@ -7,8 +7,6 @@ export default function ThresholdConfigModal({
   currentThresholds,
   onSaveThresholds
 }) {
-  if (!isOpen) return null;
-
   const [highlySimilar, setHighlySimilar] = useState(
     Math.round((currentThresholds?.highly_similar ?? 0.85) * 100)
   );
@@ -16,6 +14,8 @@ export default function ThresholdConfigModal({
     Math.round((currentThresholds?.paraphrase ?? 0.70) * 100)
   );
   const [error, setError] = useState('');
+
+  if (!isOpen) return null;
 
   const handleSave = () => {
     if (paraphrase >= highlySimilar) {

@@ -7,9 +7,20 @@ import SimilarityChart from './components/SimilarityChart';
 import MatchingSectionCard from './components/MatchingSectionCard';
 import FilterBar from './components/FilterBar';
 import ThresholdConfigModal from './components/ThresholdConfigModal';
-import { Download, RefreshCw, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Circle } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8000';
+
+function readableError(detail, fallback) {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (typeof item === 'string' ? item : item?.msg))
+      .filter(Boolean);
+    if (messages.length) return messages.join(' ');
+  }
+  return fallback;
+}
 
 export default function App() {
   // Input State
@@ -22,6 +33,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [loadingStep, setLoadingStep] = useState(0);
 
   // Thresholds State
   const [thresholds, setThresholds] = useState({
@@ -37,7 +49,10 @@ export default function App() {
   // Fetch initial config from backend
   useEffect(() => {
     fetch(`${API_BASE}/api/config`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Configuration unavailable');
+        return res.json();
+      })
       .then((data) => {
         if (data.highly_similar && data.paraphrase) {
           setThresholds({
@@ -46,12 +61,18 @@ export default function App() {
           });
         }
       })
-      .catch((err) => console.log('Backend offline or initializing:', err));
+      // The upload flow reports connectivity failures when the user takes action.
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) return undefined;
+    const timer = window.setInterval(() => setLoadingStep((step) => Math.min(step + 1, 4)), 900);
+    return () => window.clearInterval(timer);
+  }, [isLoading]);
 
   // Handle Preset Selection
   const handleSelectPreset = async (presetId) => {
-    setIsLoading(true);
     setErrorMsg('');
     try {
       const res = await fetch(`${API_BASE}/api/samples`);
@@ -59,44 +80,60 @@ export default function App() {
       const data = await res.json();
 
       const refDoc = data.reference_doc;
-      const stuDoc = presetId === 'paraphrased' 
-        ? data.preset_paraphrased.student_doc 
-        : data.preset_original.student_doc;
+      const stuDoc = presetId === 'paraphrased'
+        ? data.preset_paraphrased?.student_doc
+        : data.preset_original?.student_doc;
 
-      setReferenceFile(null);
-      setReferenceText(refDoc);
-      setStudentFile(null);
-      setStudentText(stuDoc);
+      if (!refDoc?.trim() || !stuDoc?.trim()) {
+        throw new Error('The backend sample documents are empty or unavailable.');
+      }
 
-      // Trigger automatic analysis
-      await triggerAnalysis(refDoc, stuDoc);
+      // These files contain the exact text returned by the backend sample endpoint.
+      const demoReference = new File([refDoc], 'backend-reference-sample.txt', { type: 'text/plain' });
+      const demoStudent = new File([stuDoc], `backend-${presetId}-sample.txt`, { type: 'text/plain' });
+
+      setReferenceFile(demoReference);
+      setReferenceText('');
+      setStudentFile(demoStudent);
+      setStudentText('');
+
+      await triggerAnalysis({ referenceFile: demoReference, studentFile: demoStudent });
     } catch (err) {
-      setErrorMsg(`Error loading sample preset: ${err.message}`);
+      const message = err instanceof TypeError
+        ? 'Could not reach the backend. Start the API and try the demo again.'
+        : readableError(err?.message, 'Could not load the demo. Please try again.');
+      setErrorMsg(`Could not load the demo: ${message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Trigger Document Analysis API call
-  const triggerAnalysis = async (customRefText = null, customStuText = null) => {
+  const triggerAnalysis = async (documents = {}) => {
     setIsLoading(true);
+    setLoadingStep(1);
     setErrorMsg('');
+    setAnalysisResult(null);
     try {
       const formData = new FormData();
 
-      const refTextToUse = customRefText !== null ? customRefText : referenceText;
-      const stuTextToUse = customStuText !== null ? customStuText : studentText;
+      const refFileToUse = documents.referenceFile ?? referenceFile;
+      const stuFileToUse = documents.studentFile ?? studentFile;
 
-      if (referenceFile) {
-        formData.append('reference_file', referenceFile);
-      } else if (refTextToUse.trim()) {
-        formData.append('reference_text', refTextToUse);
+      if (refFileToUse) {
+        formData.append('reference_file', refFileToUse);
+      } else if (referenceText.trim()) {
+        formData.append('reference_text', referenceText);
+      } else {
+        throw new Error('Add a reference document before analyzing.');
       }
 
-      if (studentFile) {
-        formData.append('student_file', studentFile);
-      } else if (stuTextToUse.trim()) {
-        formData.append('student_text', stuTextToUse);
+      if (stuFileToUse) {
+        formData.append('student_file', stuFileToUse);
+      } else if (studentText.trim()) {
+        formData.append('student_text', studentText);
+      } else {
+        throw new Error('Add a student document before analyzing.');
       }
 
       formData.append('highly_similar_threshold', thresholds.highly_similar);
@@ -108,17 +145,30 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.detail || 'Analysis request failed.');
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(readableError(errorBody.detail, `Analysis failed (server returned ${response.status}).`));
       }
 
       const result = await response.json();
       setAnalysisResult(result);
     } catch (err) {
-      setErrorMsg(err.message || 'Error executing semantic analysis.');
+      if (err instanceof TypeError) {
+        setErrorMsg('Could not reach the backend. Start the API at http://localhost:8000 and try again.');
+      } else {
+        setErrorMsg(readableError(err?.message, 'Analysis failed. Check that both documents contain readable text and try again.'));
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const startNewAnalysis = () => {
+    setReferenceFile(null);
+    setStudentFile(null);
+    setReferenceText('');
+    setStudentText('');
+    setAnalysisResult(null);
+    setErrorMsg('');
   };
 
   // Dynamic Threshold Updates
@@ -178,7 +228,10 @@ export default function App() {
           setStudentText={setStudentText}
           onAnalyze={() => triggerAnalysis()}
           isLoading={isLoading}
+          onValidationError={setErrorMsg}
         />
+
+        {isLoading && <LoadingState activeStep={loadingStep} />}
 
         {/* Error Notification Banner */}
         {errorMsg && (
@@ -207,6 +260,12 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  onClick={startNewAnalysis}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
+                >
+                  New analysis
+                </button>
                 <button
                   onClick={() => triggerAnalysis()}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
@@ -272,4 +331,20 @@ export default function App() {
 
     </div>
   );
+}
+
+function LoadingState({ activeStep }) {
+  const steps = ['Documents uploaded', 'Extracting text', 'Splitting sections', 'Generating semantic embeddings', 'Comparing semantic meaning', 'Generating report'];
+  return <section className="w-full max-w-3xl mx-auto mt-6 glass-panel rounded-2xl p-5 border border-indigo-500/25" aria-live="polite">
+    <div className="flex items-center gap-3 mb-4"><div className="w-5 h-5 border-2 border-indigo-300/30 border-t-indigo-300 rounded-full animate-spin" /><div><h2 className="text-sm font-bold text-white">Analyzing your documents</h2><p className="text-xs text-slate-400">This may take a moment while the backend processes the files.</p></div></div>
+    <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+      {steps.map((step, index) => {
+        const complete = index < activeStep;
+        const active = index === activeStep;
+        return <li key={step} className={`flex items-center gap-2 text-xs ${complete ? 'text-emerald-300' : active ? 'text-indigo-200' : 'text-slate-500'}`}>
+          {complete ? <CheckCircle2 className="w-4 h-4" /> : active ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Circle className="w-4 h-4" />} {step}
+        </li>;
+      })}
+    </ol>
+  </section>;
 }
