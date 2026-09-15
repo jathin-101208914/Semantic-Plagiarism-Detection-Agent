@@ -89,7 +89,10 @@ async def analyze_documents(
     # Process Reference Document
     if reference_file:
         bytes_data = await reference_file.read()
-        ref_content = extract_text(reference_file.filename, bytes_data)
+        try:
+            ref_content = extract_text(reference_file.filename, bytes_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Reference file error: {e}")
     elif reference_text:
         ref_content = reference_text
     else:
@@ -98,7 +101,10 @@ async def analyze_documents(
     # Process Student Document
     if student_file:
         bytes_data = await student_file.read()
-        stu_content = extract_text(student_file.filename, bytes_data)
+        try:
+            stu_content = extract_text(student_file.filename, bytes_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Student file error: {e}")
     elif student_text:
         stu_content = student_text
     else:
@@ -112,6 +118,11 @@ async def analyze_documents(
     # Split text into semantic sections/sentences
     ref_sections = split_into_sections(ref_content)
     stu_sections = split_into_sections(stu_content)
+
+    if not ref_sections:
+        raise HTTPException(status_code=400, detail="Reference document produced no usable text sections.")
+    if not stu_sections:
+        raise HTTPException(status_code=400, detail="Student document produced no usable text sections.")
 
     # Perform semantic embedding and similarity analysis
     result = analyze_semantic_similarity(

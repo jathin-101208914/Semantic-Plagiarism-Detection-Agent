@@ -5,16 +5,23 @@ from typing import List
 
 def extract_text_from_pdf(stream: bytes) -> str:
     """Extracts text from PDF byte stream using PyMuPDF."""
+    try:
+        doc = pymupdf.open(stream=stream, filetype="pdf")
+    except Exception as e:
+        raise ValueError(f"Failed to parse PDF: {e}")
     text = ""
-    doc = pymupdf.open(stream=stream, filetype="pdf")
     for page in doc:
         text += page.get_text() + "\n"
+    doc.close()
     return text
 
 def extract_text_from_docx(stream: bytes) -> str:
     """Extracts text from DOCX byte stream using python-docx."""
     import io
-    doc = docx.Document(io.BytesIO(stream))
+    try:
+        doc = docx.Document(io.BytesIO(stream))
+    except Exception as e:
+        raise ValueError(f"Failed to parse DOCX: {e}")
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
     return "\n".join(paragraphs)
 
@@ -27,16 +34,19 @@ def extract_text_from_txt(stream: bytes) -> str:
 
 def extract_text(filename: str, file_bytes: bytes) -> str:
     """Routes file extraction based on extension."""
-    ext = filename.lower().split(".")[-1]
+    if not filename or "." not in filename:
+        raise ValueError(f"Cannot determine file type: '{filename}'. Supported formats: PDF, DOCX, TXT.")
+    ext = filename.lower().rsplit(".", 1)[-1]
     if ext == "pdf":
         return extract_text_from_pdf(file_bytes)
     elif ext == "docx":
         return extract_text_from_docx(file_bytes)
-    elif ext in ["txt", "md"]:
+    elif ext in ("txt", "md"):
         return extract_text_from_txt(file_bytes)
     else:
-        # Fallback decoding
-        return extract_text_from_txt(file_bytes)
+        raise ValueError(
+            f"Unsupported file type '.{ext}'. Supported formats: PDF, DOCX, TXT."
+        )
 
 def clean_text(text: str) -> str:
     """Cleans text by removing unnecessary whitespace and formatting glitches."""
