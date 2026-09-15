@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, AlertCircle, Copy, CheckCircle } from 'lucide-react';
+import { AlertCircle, Copy, CheckCircle } from 'lucide-react';
 
 export default function MatchingSectionCard({ section }) {
   const {

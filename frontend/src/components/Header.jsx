@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Sliders, Sparkles, BookOpen } from 'lucide-react';
+import { ShieldCheck, Sliders, Sparkles } from 'lucide-react';
 
 export default function Header({ onOpenThresholds, currentThresholds }) {
   return (

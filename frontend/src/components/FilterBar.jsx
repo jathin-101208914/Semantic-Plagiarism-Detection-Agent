@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Filter, Layers } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 
 export default function FilterBar({
   activeFilter,
