@@ -2,17 +2,25 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class MatchingSection(BaseModel):
-    student_index: int
+    student_section_number: int
+    reference_section_number: int
     student_text: str
-    reference_index: int
     reference_text: str
+    similarity: float
+    percentage: float
+    classification: str  # "Highly Similar", "Potential Paraphrase", "Likely Original"
+
+    # Backward compatibility aliases for frontend components
+    student_index: int
+    reference_index: int
     similarity_score: float
     similarity_percentage: float
-    classification: str  # "Highly Similar", "Potential Paraphrase", "Likely Original"
 
 class SummaryMetrics(BaseModel):
     total_sections: int
+    overall_similarity: float
     overall_similarity_percentage: float
+    risk_level: str  # "HIGH PLAGIARISM RISK", "MODERATE PARAPHRASE RISK", "LOW / CLEAN"
     highly_similar_count: int
     paraphrased_count: int
     original_count: int
